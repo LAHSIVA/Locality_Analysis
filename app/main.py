@@ -3,8 +3,18 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Locality
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# CORS: tells browser allows external requests
 
 @app.get("/locality/{name}")
 def get_locality_yield(name: str, db: Session = Depends(get_db)):
@@ -62,3 +72,35 @@ def locality_financials(name: str, db: Session = Depends(get_db)):
         "payback_period_years": round(payback_years, 1),
         "ten_year_roi_percent": round(roi_percent, 2)
     }
+
+@app.get("/localities/finance")
+def all_localities_finance(db: Session = Depends(get_db)):
+    localities = db.query(Locality).all()
+    results = []
+
+    for loc in localities:
+        annual_rent = loc.avg_monthly_rent * 12
+        maintenance_cost = annual_rent * 0.10
+        net_annual_rent = annual_rent - maintenance_cost
+
+        property_value = loc.avg_price_per_sqft * loc.standard_property_size_sqft
+
+        payback_years = property_value / net_annual_rent
+
+        appreciation_rate = 0.05
+        appreciated_value = property_value * ((1 + appreciation_rate) ** 10)
+        appreciation_gain = appreciated_value - property_value
+
+        total_rental_income = net_annual_rent * 10
+        total_gain = total_rental_income + appreciation_gain
+        roi_percent = (total_gain / property_value) * 100
+
+        results.append({
+            "name": loc.name,
+            "latitude": loc.latitude,
+            "longitude": loc.longitude,
+            "payback_period_years": round(payback_years, 1),
+            "ten_year_roi_percent": round(roi_percent, 2)
+        })
+
+    return results

@@ -20,6 +20,29 @@
   </style>
 </head>
 <body>
+<div style="
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: white;
+  padding: 10px;
+  z-index: 1000;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+">
+  <label>
+    Max Payback (years):
+    <input type="number" id="paybackFilter" value="30" style="width:60px;">
+  </label>
+  <br/><br/>
+  <label>
+    Min 10Y ROI (%):
+    <input type="number" id="roiFilter" value="60" style="width:60px;">
+  </label>
+  <br/><br/>
+  <button onclick="applyFilters()">Apply</button>
+</div>
+
 
 <div id="map"></div>
 
@@ -27,59 +50,77 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // 1. Initialize map centered on Chennai
   const map = L.map('map').setView([13.0827, 80.2707], 11);
 
-  // 2. Add OpenStreetMap tiles
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  // 3. Locality data (temporary static)
-  const localities = [
-    {
-      name: "Velachery",
-      lat: 12.975,
-      lng: 80.221,
-      payback: 27.8,
-      roi: 72.4
-    },
-    {
-      name: "Porur",
-      lat: 13.035,
-      lng: 80.158,
-      payback: 29.5,
-      roi: 68.1
-    },
-    {
-      name: "Tambaram",
-      lat: 12.925,
-      lng: 80.120,
-      payback: 31.2,
-      roi: 65.0
-    },
-    {
-      name: "Anna Nagar",
-      lat: 13.085,
-      lng: 80.210,
-      payback: 25.4,
-      roi: 78.3
-    }
-  ];
+  let localityData = [];
+  let markers = [];
 
-  // 4. Add markers
-  localities.forEach(loc => {
-    const popupContent = `
-      <strong>${loc.name}</strong><br/>
-      Payback: ${loc.payback} years<br/>
-      10Y ROI: ${loc.roi}%
-    `;
+  function getColor(payback) {
+    if (payback <= 25) return "green";
+    if (payback <= 30) return "orange";
+    return "red";
+  }
 
-    L.marker([loc.lat, loc.lng])
-      .addTo(map)
-      .bindPopup(popupContent);
-  });
+  function clearMarkers() {
+    markers.forEach(marker => map.removeLayer(marker));
+    markers = [];
+  }
+
+  function renderMap() {
+    clearMarkers();
+
+    const maxPayback = parseFloat(document.getElementById("paybackFilter").value);
+    const minROI = parseFloat(document.getElementById("roiFilter").value);
+
+    localityData.forEach(loc => {
+      if (
+        loc.payback_period_years <= maxPayback &&
+        loc.ten_year_roi_percent >= minROI
+      ) {
+        const color = getColor(loc.payback_period_years);
+
+        const popupContent = `
+          <strong>${loc.name}</strong><br/>
+          Payback: ${loc.payback_period_years} years<br/>
+          10Y ROI: ${loc.ten_year_roi_percent}%
+        `;
+
+        const marker = L.circleMarker([loc.latitude, loc.longitude], {
+          radius: 12,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.7
+        })
+        .addTo(map)
+        .bindPopup(popupContent);
+
+        markers.push(marker);
+      }
+    });
+  }
+
+  function applyFilters() {
+    renderMap();
+  }
+
+  fetch("http://127.0.0.1:8000/localities/finance")
+    .then(response => response.json())
+    .then(data => {
+      localityData = data;
+      renderMap();
+    })
+    .catch(error => {
+      console.error("Error loading locality data:", error);
+    });
 </script>
+
+
 
 </body>
 </html>
+
+
