@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+from typing import Optional
+
+from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Locality
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
@@ -79,7 +81,28 @@ def all_localities_finance(
     min_roi: Optional[float] = Query(None, description="Minimum 10-year ROI percent"),
     db: Session = Depends(get_db)
 ):
-    localities = db.query(Locality).all()
+    # -----------------------------------
+    # 1️⃣ START WITH BASE QUERY
+    # -----------------------------------
+    query = db.query(Locality)
+
+    # -----------------------------------
+    # 2️⃣ APPROXIMATE DB-LEVEL FILTERING
+    # -----------------------------------
+    if max_payback is not None:
+        # annual_rent / property_value >= 1 / max_payback
+        query = query.filter(
+            (Locality.avg_monthly_rent * 12) /
+            (Locality.avg_price_per_sqft * Locality.standard_property_size_sqft)
+            >= (1 / max_payback)
+        )
+
+    # Pull only pre-filtered rows
+    localities = query.all()
+
+    # -----------------------------------
+    # 3️⃣ EXACT FINANCE LOGIC (PYTHON)
+    # -----------------------------------
     results = []
 
     for loc in localities:
@@ -100,7 +123,7 @@ def all_localities_finance(
         total_gain = total_rental_income + appreciation_gain
         roi_percent = (total_gain / property_value) * 100
 
-        # --- Backend filtering ---
+        # --- Exact backend filtering ---
         if max_payback is not None and payback_years > max_payback:
             continue
 
