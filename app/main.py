@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Locality
 
+# Simple in-memory cache
+finance_cache = {}
 app = FastAPI()
 
 app.add_middleware(
@@ -77,36 +79,35 @@ def locality_financials(name: str, db: Session = Depends(get_db)):
 
 @app.get("/localities/finance")
 def all_localities_finance(
-    max_payback: Optional[float] = Query(None, description="Maximum payback period in years"),
-    min_roi: Optional[float] = Query(None, description="Minimum 10-year ROI percent"),
+    max_payback: Optional[float] = Query(None),
+    min_roi: Optional[float] = Query(None),
     db: Session = Depends(get_db)
 ):
-    # -----------------------------------
-    # 1️⃣ START WITH BASE QUERY
-    # -----------------------------------
+    # ---------------------------
+    # 1️⃣ CACHE KEY
+    # ---------------------------
+    cache_key = (max_payback, min_roi)
+
+    if cache_key in finance_cache:
+        return finance_cache[cache_key]
+
+    # ---------------------------
+    # 2️⃣ EXISTING LOGIC (UNCHANGED)
+    # ---------------------------
     query = db.query(Locality)
 
-    # -----------------------------------
-    # 2️⃣ APPROXIMATE DB-LEVEL FILTERING
-    # -----------------------------------
     if max_payback is not None:
-        # annual_rent / property_value >= 1 / max_payback
         query = query.filter(
             (Locality.avg_monthly_rent * 12) /
             (Locality.avg_price_per_sqft * Locality.standard_property_size_sqft)
             >= (1 / max_payback)
         )
 
-    # Pull only pre-filtered rows
     localities = query.all()
 
-    # -----------------------------------
-    # 3️⃣ EXACT FINANCE LOGIC (PYTHON)
-    # -----------------------------------
     results = []
 
     for loc in localities:
-        # --- Finance calculations ---
         annual_rent = loc.avg_monthly_rent * 12
         maintenance_cost = annual_rent * 0.10
         net_annual_rent = annual_rent - maintenance_cost
@@ -123,7 +124,6 @@ def all_localities_finance(
         total_gain = total_rental_income + appreciation_gain
         roi_percent = (total_gain / property_value) * 100
 
-        # --- Exact backend filtering ---
         if max_payback is not None and payback_years > max_payback:
             continue
 
@@ -137,5 +137,10 @@ def all_localities_finance(
             "payback_period_years": round(payback_years, 1),
             "ten_year_roi_percent": round(roi_percent, 2)
         })
+
+    # ---------------------------
+    # 3️⃣ STORE IN CACHE
+    # ---------------------------
+    finance_cache[cache_key] = results
 
     return results
