@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chennai Rental Investment Map</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  // 1. Initialize map centered on Chennai
+  const map = L.map('map').setView([13.0827, 80.2707], 11);
+
+  // 2. Add OpenStreetMap tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  // 3. Locality data (temporary static)
+  const localities = [
+    {
+      name: "Velachery",
+      lat: 12.975,
+      lng: 80.221,
+      payback: 27.8,
+      roi: 72.4
+    },
+    {
+      name: "Porur",
+      lat: 13.035,
+      lng: 80.158,
+      payback: 29.5,
+      roi: 68.1
+    },
+    {
+      name: "Tambaram",
+      lat: 12.925,
+      lng: 80.120,
+      payback: 31.2,
+      roi: 65.0
+    },
+    {
+      name: "Anna Nagar",
+      lat: 13.085,
+      lng: 80.210,
+      payback: 25.4,
+      roi: 78.3
+    }
+  ];
+
+  // 4. Add markers
+  localities.forEach(loc => {
+    const popupContent = `
+      <strong>${loc.name}</strong><br/>
+      Payback: ${loc.payback} years<br/>
+      10Y ROI: ${loc.roi}%
+    `;
+
+    L.marker([loc.lat, loc.lng])
+      .addTo(map)
+      .bindPopup(popupContent);
+  });
+</script>
+
+</body>
+</html>
