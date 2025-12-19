@@ -56,8 +56,12 @@
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  let localityData = [];
   let markers = [];
+
+  function clearMarkers() {
+    markers.forEach(marker => map.removeLayer(marker));
+    markers = [];
+  }
 
   function getColor(payback) {
     if (payback <= 25) return "green";
@@ -65,58 +69,47 @@
     return "red";
   }
 
-  function clearMarkers() {
-    markers.forEach(marker => map.removeLayer(marker));
-    markers = [];
-  }
-
-  function renderMap() {
+  function applyFilters() {
     clearMarkers();
 
-    const maxPayback = parseFloat(document.getElementById("paybackFilter").value);
-    const minROI = parseFloat(document.getElementById("roiFilter").value);
+    const maxPayback = document.getElementById("paybackFilter").value;
+    const minROI = document.getElementById("roiFilter").value;
 
-    localityData.forEach(loc => {
-      if (
-        loc.payback_period_years <= maxPayback &&
-        loc.ten_year_roi_percent >= minROI
-      ) {
-        const color = getColor(loc.payback_period_years);
+    let url = `http://127.0.0.1:8000/localities/finance?`;
 
-        const popupContent = `
-          <strong>${loc.name}</strong><br/>
-          Payback: ${loc.payback_period_years} years<br/>
-          10Y ROI: ${loc.ten_year_roi_percent}%
-        `;
+    if (maxPayback) url += `max_payback=${maxPayback}&`;
+    if (minROI) url += `min_roi=${minROI}`;
 
-        const marker = L.circleMarker([loc.latitude, loc.longitude], {
-          radius: 12,
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.7
-        })
-        .addTo(map)
-        .bindPopup(popupContent);
+    fetch(url)
+      .then(response => response.json())
+      .then(localities => {
+        localities.forEach(loc => {
+          const color = getColor(loc.payback_period_years);
 
-        markers.push(marker);
-      }
-    });
+          const popupContent = `
+            <strong>${loc.name}</strong><br/>
+            Payback: ${loc.payback_period_years} years<br/>
+            10Y ROI: ${loc.ten_year_roi_percent}%
+          `;
+
+          const marker = L.circleMarker([loc.latitude, loc.longitude], {
+            radius: 12,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.7
+          })
+          .addTo(map)
+          .bindPopup(popupContent);
+
+          markers.push(marker);
+        });
+      });
   }
 
-  function applyFilters() {
-    renderMap();
-  }
-
-  fetch("http://127.0.0.1:8000/localities/finance")
-    .then(response => response.json())
-    .then(data => {
-      localityData = data;
-      renderMap();
-    })
-    .catch(error => {
-      console.error("Error loading locality data:", error);
-    });
+  // Initial load
+  applyFilters();
 </script>
+
 
 
 

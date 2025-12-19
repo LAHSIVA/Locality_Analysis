@@ -74,11 +74,16 @@ def locality_financials(name: str, db: Session = Depends(get_db)):
     }
 
 @app.get("/localities/finance")
-def all_localities_finance(db: Session = Depends(get_db)):
+def all_localities_finance(
+    max_payback: Optional[float] = Query(None, description="Maximum payback period in years"),
+    min_roi: Optional[float] = Query(None, description="Minimum 10-year ROI percent"),
+    db: Session = Depends(get_db)
+):
     localities = db.query(Locality).all()
     results = []
 
     for loc in localities:
+        # --- Finance calculations ---
         annual_rent = loc.avg_monthly_rent * 12
         maintenance_cost = annual_rent * 0.10
         net_annual_rent = annual_rent - maintenance_cost
@@ -94,6 +99,13 @@ def all_localities_finance(db: Session = Depends(get_db)):
         total_rental_income = net_annual_rent * 10
         total_gain = total_rental_income + appreciation_gain
         roi_percent = (total_gain / property_value) * 100
+
+        # --- Backend filtering ---
+        if max_payback is not None and payback_years > max_payback:
+            continue
+
+        if min_roi is not None and roi_percent < min_roi:
+            continue
 
         results.append({
             "name": loc.name,
